@@ -5,28 +5,34 @@ import { Resend } from 'resend';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function sendFeedback(formData: FormData) {
-  const name = formData.get('name') as string;
-  const email = formData.get('email') as string;
-  const type = formData.get('type') as string;
-  const message = formData.get('message') as string;
+  const name = String(formData.get('name') || '').trim();
+  const email = String(formData.get('email') || '').trim();
+  const company = String(formData.get('company') || '').trim();
+  const designation = String(formData.get('designation') || '').trim();
+  const project = String(formData.get('project') || '').trim();
+  const type = String(formData.get('type') || '').trim();
+  const message = String(formData.get('message') || '').trim();
 
   // Basic Validation
-  if (!name || !email || !message) {
+  if (!name || !email || !project || !message) {
     return { error: 'Please fill out all required fields.' };
   }
 
   try {
-    const { data, error } = await resend.emails.send({
+    const { error } = await resend.emails.send({
       from: 'PortalEra Feedback <onboarding@resend.dev>', // Keep this as is for testing
       to: ['portalera.in@gmail.com'], // Replace with your actual email address!
-      subject: `New ${type} from ${name}`,
+      subject: `New ${type || 'Feedback'} for ${project} from ${name}`,
       replyTo: email, // If you reply to the email, it will go to the user
       html: `
         <h2>New Feedback Submission: PortalEra</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Type:</strong> ${type}</p>
-        <p><strong>Message:</strong><br/> ${message}</p>
+        <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+        <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+        <p><strong>Company/Organization:</strong> ${escapeHtml(company || 'Not provided')}</p>
+        <p><strong>Designation:</strong> ${escapeHtml(designation || 'Not provided')}</p>
+        <p><strong>PortalEra made:</strong> ${escapeHtml(project)}</p>
+        <p><strong>Type:</strong> ${escapeHtml(type || 'General feedback')}</p>
+        <p><strong>Message:</strong><br/> ${escapeHtml(message).replace(/\n/g, '<br/>')}</p>
       `,
     });
 
@@ -36,8 +42,18 @@ export async function sendFeedback(formData: FormData) {
     }
 
     return { success: true };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('Unexpected error:', err);
-    return { error: err.message || 'Failed to send feedback. Please try again later.' };
+    const message = err instanceof Error ? err.message : 'Failed to send feedback. Please try again later.';
+    return { error: message };
   }
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
